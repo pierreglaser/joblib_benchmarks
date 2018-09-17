@@ -5,14 +5,13 @@ import os
 from joblib import Parallel, delayed
 import numpy as np
 
-# except for specific use cases, this will be the
-# number of worker launched each time a Parallel(delayed) call
-# is executed
+# Except for specific use cases, this will be the number of workers
+# launched each time a Parallel(delayed(...)(...)) call is executed.
 N_JOBS_MAX = os.cpu_count()
 
-# number of function calls submitted to each worker (on average)
-# each time a Parallel(delayed(...)) call is done
-# total number of function calls: N_JOBS_MAX*AVG_CALLS_PER_WORKERS
+# Number of function calls submitted to each worker (on average)
+# each time a Parallel(delayed(...)(...)) call is executed.
+# Total number of function calls: N_JOBS_MAX*AVG_CALLS_PER_WORKERS
 AVG_CALLS_PER_WORKERS = 2
 
 N_FUNCTION_CALLS = AVG_CALLS_PER_WORKERS * N_JOBS_MAX
@@ -36,9 +35,8 @@ def add_one(x):
 
 class TimeSuite:
     def time_parallel_dummy_call(self):
-        res = Parallel(
-            n_jobs=N_JOBS_MAX, backend='loky')(
-                delayed(add_one)(i) for i in range(N_FUNCTION_CALLS))
+        res = Parallel(n_jobs=N_JOBS_MAX)(
+            delayed(add_one)(i) for i in range(N_FUNCTION_CALLS))
 
     def time_large_array_as_input_and_small_output(self, use_numpy, shape):
         """benchark the time of shipping a numpy array to a child process
@@ -49,9 +47,8 @@ class TimeSuite:
         large_arrays = make_arrays(
             N_FUNCTION_CALLS, shape, use_numpy=use_numpy)
 
-        res = Parallel(
-            n_jobs=N_JOBS_MAX, backend='loky')(delayed(return_one)(large_array)
-                                               for large_array in large_arrays)
+        res = Parallel(n_jobs=N_JOBS_MAX)(
+            delayed(return_one)(large_array) for large_array in large_arrays)
 
     time_large_array_as_input_and_small_output.param_names = [
         'use_numpy', 'shape'
