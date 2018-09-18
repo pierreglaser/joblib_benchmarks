@@ -17,64 +17,90 @@ AVG_CALLS_PER_WORKERS = 2
 N_FUNCTION_CALLS = AVG_CALLS_PER_WORKERS * N_JOBS_MAX
 
 
-def make_arrays(n, shape, use_numpy=True):
-    arrays = np.random.randn(n, *shape)
+def make_arrays(shape, use_numpy):
+    """wrapper around np.random.randn, with optional tolist()
+    """
+    arrays = np.random.randn(*shape)
     if not use_numpy:
         return arrays.tolist()
     else:
         return arrays
 
 
-def return_one(x):
-    return 1
+def compute_len(x):
+    return len(x)
 
 
-def add_one(x):
-    return x + 1
+def make_bytes(size):
+    return os.urandom(size)
+
+
+def make_dict(size):
+    return dict(zip(range(size), range(size)))
 
 
 class TimeSuite:
-    def time_parallel_dummy_call(self):
-        res = Parallel(n_jobs=N_JOBS_MAX)(
-            delayed(add_one)(i) for i in range(N_FUNCTION_CALLS))
+    def time_array_as_input(self, shape, use_numpy):
+        """make the parent create big arrays and send them to child processes
 
-    def time_large_array_as_input_and_small_output(self, use_numpy, shape):
-        """benchark the time of shipping a numpy array to a child process
-
-        for sufficiently big arrays (size>1e6 for joblib by default)
+        For sufficiently large sizes (size>1e6 by default), memmapping will be
+        automatically used
         """
 
-        large_arrays = make_arrays(
-            N_FUNCTION_CALLS, shape, use_numpy=use_numpy)
+        large_arrays = make_arrays((N_FUNCTION_CALLS, *shape),
+                                   use_numpy)
 
         res = Parallel(n_jobs=N_JOBS_MAX)(
-            delayed(return_one)(large_array) for large_array in large_arrays)
+            delayed(compute_len)(large_array) for large_array in large_arrays)
 
-    time_large_array_as_input_and_small_output.param_names = [
-        'use_numpy', 'shape'
-    ]
-    time_large_array_as_input_and_small_output.params = [
+    time_array_as_input.param_names = ['shape', 'use_numpy']
+    time_array_as_input.params = [
+            ((10, 100), (100, 1000), (1000, 10000)),
             (True, False),
-            ((10, 100), (100, 1000), (1000, 10000))
-            ]  # yapf: disable
+            ]
 
-    def time_small_input_and_large_array_as_output(use_numpy, shape):
-        """benchark the time of shipping a numpy array back to
-        the parent process
+    def time_array_as_output(self, shape, use_numpy):
+        """make child processes create big arrays and send it back
 
-        for sufficiently big arrays (size>1e6 for joblib by default)
+        For sufficiently large shapes, memmapping will be automatically used
         """
 
-        large_arrays = make_arrays(
-            N_FUNCTION_CALLS, shape, use_numpy=use_numpy)
-
         res = Parallel(n_jobs=N_JOBS_MAX)(
-            delayed(return_one)(large_array) for large_array in large_arrays)
+            delayed(make_arrays)(shape, use_numpy)
+            for i in range(N_FUNCTION_CALLS))
 
-    time_small_input_and_large_array_as_output.param_names = [
-        'use_numpy', 'shape'
-    ]
-    time_small_input_and_large_array_as_output.params = [
+    time_array_as_output.param_names = ['shape', 'use_numpy']
+    time_array_as_output.params = [
+            ((10, 100), (100, 1000), (1000, 10000)),
             (True, False),
-            ((10, 100), (100, 1000), (1000, 10000))
-            ]  # yapf: disable
+            ]
+
+    def time_dict_as_input(self, size):
+        input_dict = make_dict(size)
+        res = Parallel(n_jobs=N_JOBS_MAX)(
+            delayed(compute_len)(input_dict) for i in range(N_FUNCTION_CALLS))
+
+    time_dict_as_input.param_names = ['size']
+    time_dict_as_input.params = [100, 1000, 10000]
+
+    def time_bytes_as_input(self, size):
+        input_bytes = make_bytes(size)
+        res = Parallel(n_jobs=N_JOBS_MAX)(
+            delayed(compute_len)(input_bytes) for i in range(N_FUNCTION_CALLS))
+
+    time_bytes_as_input.param_names = ['size']
+    time_bytes_as_input.params = [100, 1000, 10000]
+
+    def time_bytes_as_output(self, size):
+        res = Parallel(n_jobs=N_JOBS_MAX)(
+            delayed(make_bytes)(size) for i in range(N_FUNCTION_CALLS))
+
+    time_bytes_as_output.param_names = ['size']
+    time_bytes_as_output.params = [100, 1000, 10000]
+
+    def time_dict_as_output(self, size):
+        res = Parallel(n_jobs=N_JOBS_MAX)(
+            delayed(make_dict)(size) for i in range(N_FUNCTION_CALLS))
+
+    time_dict_as_output.param_names = ['size']
+    time_dict_as_output.params = [100, 1000, 10000]
