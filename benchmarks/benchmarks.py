@@ -1,5 +1,3 @@
-# Write the benchmarking functions here.
-# See "Writing benchmarks" in the asv docs for more information.
 import os
 
 from joblib import Parallel, delayed
@@ -17,22 +15,10 @@ AVG_CALLS_PER_WORKERS = 2
 N_FUNCTION_CALLS = AVG_CALLS_PER_WORKERS * N_JOBS_MAX
 
 
-def make_arrays(shape, use_numpy):
-    """wrapper around np.random.randn, with optional tolist()
-    """
-    arrays = np.random.randn(*shape)
-    if not use_numpy:
-        return arrays.tolist()
-    else:
-        return arrays
-
-
-def compute_len(x):
-    return len(x)
-
-
-def make_bytes(size):
-    return os.urandom(size)
+# Small helper functions as it is not possible to create basic instances of
+# list/dict of a specific size using a single function call
+def make_list(size):
+    return list(range(size))
 
 
 def make_dict(size):
@@ -40,67 +26,104 @@ def make_dict(size):
 
 
 class TimeSuite:
-    def time_array_as_input(self, shape, use_numpy):
+
+    # Numpy arrays benchmarks
+
+    def time_np_array_as_input(self, size):
         """make the parent create big arrays and send them to child processes
 
         For sufficiently large sizes (size>1e6 by default), memmapping will be
         automatically used
         """
 
-        large_arrays = make_arrays((N_FUNCTION_CALLS, *shape),
-                                   use_numpy)
-
+        arrays = np.random.randn(size)
         res = Parallel(n_jobs=N_JOBS_MAX)(
-            delayed(compute_len)(large_array) for large_array in large_arrays)
+            delayed(np.sum)(array) for array in arrays)
 
-    time_array_as_input.param_names = ['shape', 'use_numpy']
-    time_array_as_input.params = [
-            ((10, 100), (100, 1000), (1000, 10000)),
-            (True, False),
-            ]
+    time_np_array_as_input.param_names = ['size']
+    time_np_array_as_input.params = ([1000, 100000, 10000000], )
 
-    def time_array_as_output(self, shape, use_numpy):
+    def time_np_array_as_output(self, size):
         """make child processes create big arrays and send it back
 
         For sufficiently large shapes, memmapping will be automatically used
         """
 
         res = Parallel(n_jobs=N_JOBS_MAX)(
-            delayed(make_arrays)(shape, use_numpy)
-            for i in range(N_FUNCTION_CALLS))
+            delayed(np.random.randn)(size) for i in range(N_FUNCTION_CALLS))
 
-    time_array_as_output.param_names = ['shape', 'use_numpy']
-    time_array_as_output.params = [
-            ((10, 100), (100, 1000), (1000, 10000)),
-            (True, False),
-            ]
+    time_np_array_as_output.param_names = ['size']
+    time_np_array_as_output.params = ([1000, 100000, 10000000], )
+
+    # def time_np_array_as_input_and_output(self, size):
+    #     array = np.random.randn(size)
+
+    #     # we reshape the array to the biggest possible square matrix, and
+    #     # compute its eigenvalues in the child processes
+    #     dim = np.floor(np.sqrt(len(e.size)))
+    #     array = array.reshape(dim, dim)
+
+    #     res = Parallel(n_jobs=N_JOBS_MAX)(
+    #             delayed(np.linalg.eid)(array) for _ in
+    #             range(N_FUNCTION_CALLS)
+    #             )
+
+    # time_np_array_as_input_and_output.param_names = ['size']
+    # time_np_array_as_input_and_output.params = ([1000, 100000, 10000000],)
+
+    # List benchmarks
+
+    def time_list_as_input(self, size):
+        """make the parent create big arrays and send them to child processes
+
+        For sufficiently large sizes (size>1e6 by default), memmapping will be
+        automatically used
+        """
+
+        input_list = make_list(size)
+        res = Parallel(n_jobs=N_JOBS_MAX)(
+            delayed(len)(input_list) for _ in range(N_FUNCTION_CALLS))
+
+    time_list_as_input.param_names = ['size']
+    time_list_as_input.params = ([1000, 100000, 10000000], )
+
+    def time_list_as_output(self, size):
+        res = Parallel(n_jobs=N_JOBS_MAX)(
+            delayed(make_list)(size) for _ in range(N_FUNCTION_CALLS))
+
+    time_list_as_output.param_names = ['size']
+    time_list_as_output.params = ([1000, 100000, 10000000], )
+
+    # Dict benchmarks
 
     def time_dict_as_input(self, size):
         input_dict = make_dict(size)
         res = Parallel(n_jobs=N_JOBS_MAX)(
-            delayed(compute_len)(input_dict) for i in range(N_FUNCTION_CALLS))
+            delayed(len)(input_dict) for _ in range(N_FUNCTION_CALLS))
 
     time_dict_as_input.param_names = ['size']
-    time_dict_as_input.params = [100, 1000, 10000]
-
-    def time_bytes_as_input(self, size):
-        input_bytes = make_bytes(size)
-        res = Parallel(n_jobs=N_JOBS_MAX)(
-            delayed(compute_len)(input_bytes) for i in range(N_FUNCTION_CALLS))
-
-    time_bytes_as_input.param_names = ['size']
-    time_bytes_as_input.params = [100, 1000, 10000]
-
-    def time_bytes_as_output(self, size):
-        res = Parallel(n_jobs=N_JOBS_MAX)(
-            delayed(make_bytes)(size) for i in range(N_FUNCTION_CALLS))
-
-    time_bytes_as_output.param_names = ['size']
-    time_bytes_as_output.params = [100, 1000, 10000]
+    time_dict_as_input.params = ([1000, 100000, 10000000], )
 
     def time_dict_as_output(self, size):
         res = Parallel(n_jobs=N_JOBS_MAX)(
-            delayed(make_dict)(size) for i in range(N_FUNCTION_CALLS))
+            delayed(make_dict)(size) for _ in range(N_FUNCTION_CALLS))
 
     time_dict_as_output.param_names = ['size']
-    time_dict_as_output.params = [100, 1000, 10000]
+    time_dict_as_output.params = ([1000, 100000, 10000000], )
+
+    # Bytes benchmarks
+
+    def time_bytes_as_input(self, size):
+        input_bytes = os.urandom(size)
+        res = Parallel(n_jobs=N_JOBS_MAX)(
+            delayed(len)(input_bytes) for _ in range(N_FUNCTION_CALLS))
+
+    time_bytes_as_input.param_names = ['size']
+    time_bytes_as_input.params = ([1000, 100000, 10000000], )
+
+    def time_bytes_as_output(self, size):
+        res = Parallel(n_jobs=N_JOBS_MAX)(
+            delayed(os.urandom)(size) for _ in range(N_FUNCTION_CALLS))
+
+    time_bytes_as_output.param_names = ['size']
+    time_bytes_as_output.params = ([1000, 100000, 10000000], )
