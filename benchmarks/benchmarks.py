@@ -55,21 +55,21 @@ class TimeSuite:
     time_np_array_as_output.param_names = ['size']
     time_np_array_as_output.params = ([1000, 100000, 10000000], )
 
-    # def time_np_array_as_input_and_output(self, size):
-    #     array = np.random.randn(size)
+    def time_np_array_as_input_and_output(self, size):
+        array = np.random.randn(size)
 
-    #     # we reshape the array to the biggest possible square matrix, and
-    #     # compute its eigenvalues in the child processes
-    #     dim = np.floor(np.sqrt(len(e.size)))
-    #     array = array.reshape(dim, dim)
+        # we reshape the array to the biggest possible square matrix, and
+        # compute its eigenvalues in the child processes
+        dim = np.floor(np.sqrt(len(e.size)))
+        array = array.reshape(dim, dim)
 
-    #     res = Parallel(n_jobs=N_JOBS_MAX)(
-    #             delayed(np.linalg.eid)(array) for _ in
-    #             range(N_FUNCTION_CALLS)
-    #             )
+        res = Parallel(n_jobs=N_JOBS_MAX)(
+                delayed(np.linalg.eid)(array) for _ in
+                range(N_FUNCTION_CALLS)
+                )
 
-    # time_np_array_as_input_and_output.param_names = ['size']
-    # time_np_array_as_input_and_output.params = ([1000, 100000, 10000000],)
+    time_np_array_as_input_and_output.param_names = ['size']
+    time_np_array_as_input_and_output.params = ([1000, 100000, 10000000],)
 
     # List benchmarks
 
