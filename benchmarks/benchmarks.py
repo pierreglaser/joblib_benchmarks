@@ -17,17 +17,56 @@ N_FUNCTION_CALLS = AVG_CALLS_PER_WORKERS * N_JOBS_MAX
 
 # Small helper functions as it is not possible to create basic instances of
 # list/dict of a specific size using a single function call
-def make_list(size):
-    return list(range(size))
-
-
 def make_dict(size):
     return dict(zip(range(size), range(size)))
 
 
-class TimeSuite:
+def compute_eigen(arr):
+    """reshape a 1-dim array to a square matrix and compute its eigenvalues
 
-    # Numpy arrays benchmarks
+    :param arr: a 1-dimensional array
+
+    In order for arr to be reshaped to a square matrix, it must be a perfect
+    # square. For this reason,
+    - we find the closest exact square to its number of elements (dim**2)
+    - the we subset arr it to its first dim**2 values
+    - finally, we do the appropriate reshaping with a dimension of dim
+    """
+
+    dim = int(np.sqrt(arr.size))
+    arr = arr[:dim**2]
+    square_matrix = arr.reshape(dim, dim)
+    return np.linalg.svd(square_matrix)
+
+
+# The benchmark routine of asv can be summarized as follow:
+# for b in benchmark:                        # loop 1
+#     for i in range(b.repeat):              # loop 2
+#         for args in params:                # loop 3
+#             b.setup(*arg)
+#             for function in b:             # loop 4
+#                 for n in range(b.number):  # loop 5
+#                     function(*arg)
+#             b.teardown(*arg)
+#
+# number and repeat attributes differ in the sense that a setup and teardown
+# call is run between two iterations of loop 2, in opposition with loop 5.
+# For most cases here, we will use the number attribute
+
+
+class NpArrayTimeSuite:
+    param_names = ['size']
+    params = ([1000, 100000, 10000000], )
+
+    # if a benchmark does not return anything after 180 it will fail
+    # automatically
+    timeout = 180
+    processes = 1
+    number = 2
+    repeat = 1
+
+    def setup(self, size):
+        self.array = np.random.randn(size)
 
     def time_np_array_as_input(self, size):
         """make the parent create big arrays and send them to child processes
@@ -36,94 +75,77 @@ class TimeSuite:
         automatically used
         """
 
-        arrays = np.random.randn(size)
         res = Parallel(n_jobs=N_JOBS_MAX)(
-            delayed(np.sum)(array) for array in arrays)
-
-    time_np_array_as_input.param_names = ['size']
-    time_np_array_as_input.params = ([1000, 100000, 10000000], )
+            delayed(np.sum)(self.array) for _ in range(N_FUNCTION_CALLS))
 
     def time_np_array_as_output(self, size):
-        """make child processes create big arrays and send it back
-
-        For sufficiently large shapes, memmapping will be automatically used
-        """
-
         res = Parallel(n_jobs=N_JOBS_MAX)(
             delayed(np.random.randn)(size) for i in range(N_FUNCTION_CALLS))
 
-    time_np_array_as_output.param_names = ['size']
-    time_np_array_as_output.params = ([1000, 100000, 10000000], )
-
     def time_np_array_as_input_and_output(self, size):
-        array = np.random.randn(size)
+        res = Parallel(n_jobs=N_JOBS_MAX)(delayed(compute_eigen)(self.array)
+                                          for _ in range(N_FUNCTION_CALLS))
 
-        # we reshape the array to the biggest possible square matrix, and
-        # compute its eigenvalues in the child processes
-        dim = np.floor(np.sqrt(len(e.size)))
-        array = array.reshape(dim, dim)
 
-        res = Parallel(n_jobs=N_JOBS_MAX)(
-                delayed(np.linalg.eid)(array) for _ in
-                range(N_FUNCTION_CALLS)
-                )
+# List benchmarks
+class ListTimeSuite:
+    param_names = ['size']
+    params = ([1000, 100000, 10000000], )
+    timeout = 180
+    processes = 1
+    number = 2
+    repeat = 1
 
-    time_np_array_as_input_and_output.param_names = ['size']
-    time_np_array_as_input_and_output.params = ([1000, 100000, 10000000],)
-
-    # List benchmarks
+    def setup(self, size):
+        self.list = list(range(size))
 
     def time_list_as_input(self, size):
-        """make the parent create big arrays and send them to child processes
-
-        For sufficiently large sizes (size>1e6 by default), memmapping will be
-        automatically used
-        """
-
-        input_list = make_list(size)
         res = Parallel(n_jobs=N_JOBS_MAX)(
-            delayed(len)(input_list) for _ in range(N_FUNCTION_CALLS))
-
-    time_list_as_input.param_names = ['size']
-    time_list_as_input.params = ([1000, 100000, 10000000], )
+            delayed(len)(self.list) for _ in range(N_FUNCTION_CALLS))
 
     def time_list_as_output(self, size):
         res = Parallel(n_jobs=N_JOBS_MAX)(
-            delayed(make_list)(size) for _ in range(N_FUNCTION_CALLS))
+            delayed(lambda x: list(range(x)))(size)
+            for _ in range(N_FUNCTION_CALLS))
 
-    time_list_as_output.param_names = ['size']
-    time_list_as_output.params = ([1000, 100000, 10000000], )
 
-    # Dict benchmarks
+# Dict benchmarks
+class DictTimeSuite:
+    param_names = ['size']
+    params = ([1000, 100000, 10000000], )
+    timeout = 180
+    processes = 1
+    number = 2
+    repeat = 1
+
+    def setup(self, size):
+        self.dict = make_dict(size)
 
     def time_dict_as_input(self, size):
-        input_dict = make_dict(size)
         res = Parallel(n_jobs=N_JOBS_MAX)(
-            delayed(len)(input_dict) for _ in range(N_FUNCTION_CALLS))
-
-    time_dict_as_input.param_names = ['size']
-    time_dict_as_input.params = ([1000, 100000, 10000000], )
+            delayed(len)(self.dict) for _ in range(N_FUNCTION_CALLS))
 
     def time_dict_as_output(self, size):
         res = Parallel(n_jobs=N_JOBS_MAX)(
             delayed(make_dict)(size) for _ in range(N_FUNCTION_CALLS))
 
-    time_dict_as_output.param_names = ['size']
-    time_dict_as_output.params = ([1000, 100000, 10000000], )
 
-    # Bytes benchmarks
+# Bytes benchmarks
+class BytesBenchmark:
+    param_names = ['size']
+    params = ([1000, 100000, 10000000], )
+    timeout = 180
+    processes = 1
+    number = 2
+    repeat = 1
+
+    def setup(self, size):
+        self.bytes = os.urandom(size)
 
     def time_bytes_as_input(self, size):
-        input_bytes = os.urandom(size)
         res = Parallel(n_jobs=N_JOBS_MAX)(
-            delayed(len)(input_bytes) for _ in range(N_FUNCTION_CALLS))
-
-    time_bytes_as_input.param_names = ['size']
-    time_bytes_as_input.params = ([1000, 100000, 10000000], )
+            delayed(len)(self.bytes) for _ in range(N_FUNCTION_CALLS))
 
     def time_bytes_as_output(self, size):
         res = Parallel(n_jobs=N_JOBS_MAX)(
             delayed(os.urandom)(size) for _ in range(N_FUNCTION_CALLS))
-
-    time_bytes_as_output.param_names = ['size']
-    time_bytes_as_output.params = ([1000, 100000, 10000000], )
