@@ -3,14 +3,12 @@ set -o errexit
 set -o nounset
 set -o xtrace
 
-# we assume that the script is ran from within the joblib_benchmarks
-# repository, so that there exists a launch script doing:
-# "git clone joblib_bencmarks && cd joblib_benchmarks"
-# "source remote_run_script.sh"
-JOBLIB_BENCHMARK_LOCATION=$PWD
+# This script is expected to be run from the root of the joblib_benchmarks
+# repository.
+JOBLIB_BENCHMARKS_DIRECTORY=$PWD
 
-# all repository, python distributions and benchmaks will be ran here
-BENCHMARKS_TEMP_DIR="/tmp/benchmark_temp_dir"
+# all repositories, python distributions and benchmaks will be ran here
+BENCHMARKS_TEMP_DIR="/tmp/run_joblib_benchmarks"
 mkdir "${BENCHMARKS_TEMP_DIR}"
 cd "${BENCHMARKS_TEMP_DIR}"
 
@@ -32,7 +30,7 @@ echo "...done. Cloning joblib..."
 git clone https://github.com/joblib/joblib
 
 echo "...done. Copying joblib_benchmarks..."
-cp -r "${JOBLIB_BENCHMARK_LOCATION}" joblib_benchmarks
+cp -r "${JOBLIB_BENCHMARKS_DIRECTORY}" joblib_benchmarks
 
 echo "...done. Installing asv..."
 pip install asv
