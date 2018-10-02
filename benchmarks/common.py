@@ -44,7 +44,7 @@ class Benchmark:
     # automatically
     timeout = 180
     processes = 1
-    number = 2
+    number = 1
     repeat = 1
 
     def __init__(self):
