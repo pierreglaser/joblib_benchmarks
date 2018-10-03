@@ -11,15 +11,14 @@ The benchmark routine of asv can be summarized as follow:
 for b in benchmark:                        # loop 1
     for i in range(b.repeat):              # loop 2
         for args in params:                # loop 3
-            b.setup(*arg)
             for function in b:             # loop 4
+                b.setup(*arg)
                 for n in range(b.number):  # loop 5
                     function(*arg)
-            b.teardown(*arg)
+                b.teardown(*arg)
 
 number and repeat attributes differ in the sense that a setup and teardown
 call is run between two iterations of loop 2, in opposition with loop 5.
-For most cases here, we will use the number attribute
 
 """
 import os
