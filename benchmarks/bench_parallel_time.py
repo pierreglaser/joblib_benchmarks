@@ -117,3 +117,26 @@ class BytesSuite:
 
     time_bytes_as_output.pretty_name = ('Parallel calls with bytes as'
                                         ' outputs: running time')
+
+
+class DictSuite:
+    param_names = ['size']
+    params = ([10000, 100000, 1000000], )
+
+    def setup(self, size):
+        self.dict = make_dict(size)
+
+    def time_dict_as_input(self, size):
+        res = Parallel(n_jobs=N_JOBS_MAX)(
+            delayed(len)(self.dict) for _ in range(N_FUNCTION_CALLS))
+
+    time_dict_as_input.pretty_name = ('Parallel calls with dicts as'
+                                      ' inputs: running time')
+
+    def time_dict_as_output(self, size):
+        res = Parallel(n_jobs=N_JOBS_MAX)(
+                delayed(lambda x: dict(zip(range(x), range(x))))(size)
+                for _ in range(N_FUNCTION_CALLS))
+
+    time_dict_as_output.pretty_name = ('Parallel calls with dicts as'
+                                       ' outputs: running time')
