@@ -15,7 +15,7 @@ from .common import compute_eigen, make_dict, make_list
 from .common import Benchmark
 
 
-class NpArraySuite:
+class NpArraySuite(Benchmark):
     param_names = ['size', 'use_memmap']
     params = ([(100, 100), (300, 300), (1000, 1000)], [True, False])
 
@@ -66,13 +66,9 @@ class NpArraySuite:
         ' time')
 
 
-class ListSuite:
+class ListSuite(Benchmark):
     param_names = ['size']
     params = ([10000, 100000, 1000000], )
-    timeout = 180
-    processes = 1
-    number = 2
-    repeat = 1
 
     def setup(self, size):
         self.list = list(range(size))
@@ -93,13 +89,9 @@ class ListSuite:
                                        ' outputs: running time')
 
 
-class BytesSuite:
+class BytesSuite(Benchmark):
     param_names = ['size']
     params = ([10000, 100000, 1000000], )
-    timeout = 180
-    processes = 1
-    number = 2
-    repeat = 1
 
     def setup(self, size):
         self.bytes = os.urandom(size)
@@ -119,7 +111,7 @@ class BytesSuite:
                                         ' outputs: running time')
 
 
-class DictSuite:
+class DictSuite(Benchmark):
     param_names = ['size']
     params = ([10000, 100000, 1000000], )
 
