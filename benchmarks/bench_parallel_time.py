@@ -17,10 +17,10 @@ from .common import Benchmark
 
 class NpArraySuite:
     param_names = ['size', 'use_memmap']
-    params = ([10000, 100000, 1000000], [True, False])
+    params = ([(100, 100), (300, 300), (1000, 1000)], [True, False])
 
     def setup(self, size, use_memmap):
-        self.array = np.random.randn(size)
+        self.array = np.random.randn(*size)
         if use_memmap:
             # we force memmmaping for every array by setting the object size
             # threhsold above which memmaping is activated to its minimum
@@ -47,8 +47,9 @@ class NpArraySuite:
     def time_np_array_as_output(self, size, use_memmap):
         res = Parallel(
             n_jobs=N_JOBS_MAX,
-            max_nbytes=self.max_nbytes)(delayed(np.random.randn)(size)
-                                        for i in range(N_FUNCTION_CALLS))
+            max_nbytes=self.max_nbytes)(delayed(
+                lambda x: np.random.randn(*x))(size)
+                for i in range(N_FUNCTION_CALLS))
 
     time_np_array_as_output.pretty_name = ('Parallel calls with numpy arrays'
                                            ' as outputs: running time')
@@ -56,8 +57,9 @@ class NpArraySuite:
     def time_np_array_as_input_and_output(self, size, use_memmap):
         res = Parallel(
             n_jobs=N_JOBS_MAX,
-            max_nbytes=self.max_nbytes)(delayed(compute_eigen)(self.array)
-                                        for _ in range(N_FUNCTION_CALLS))
+            max_nbytes=self.max_nbytes)(delayed(
+                lambda x: np.linalg.svd(x))(self.array)
+                for _ in range(N_FUNCTION_CALLS))
 
     time_np_array_as_input_and_output.pretty_name = (
         'Parallel calls with numpy arrays as outputs and inputs: running'
@@ -84,7 +86,8 @@ class ListSuite:
 
     def time_list_as_output(self, size):
         res = Parallel(n_jobs=N_JOBS_MAX)(
-            delayed(make_list)(size) for _ in range(N_FUNCTION_CALLS))
+                delayed(lambda x: list(range(x)))(size)
+                for _ in range(N_FUNCTION_CALLS))
 
     time_list_as_output.pretty_name = ('Parallel calls with lists as'
                                        ' outputs: running time')
