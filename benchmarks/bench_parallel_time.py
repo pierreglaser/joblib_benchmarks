@@ -11,8 +11,8 @@ from joblib import Parallel, delayed
 import numpy as np
 
 from .common import N_FUNCTION_CALLS, N_JOBS_MAX
-from .common import compute_eigen, make_dict, make_list
 from .common import Benchmark
+from .common import make_dict
 
 
 class NpArraySuite(Benchmark):
