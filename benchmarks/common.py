@@ -22,7 +22,6 @@ call is run between two iterations of loop 2, in opposition with loop 5.
 
 """
 import os
-
 import numpy as np
 
 
@@ -78,3 +77,23 @@ def compute_eigen(arr):
     return np.linalg.svd(square_matrix)
 
 
+class EstimatorWithLargeList:
+    """simple estimator, with a large list as an attribute"""
+    def __init__(self):
+        self.large_list = list(range(100000))
+        self.best_estimator_ = self
+
+    def get_params(self, *args, **kwargs):
+        return dict()
+
+    def set_params(self, *args, **kwargs):
+        return self
+
+    def fit(self, *args, **kwargs):
+        pass
+
+    def predict(self, X):
+        return [0]*repeat(len(X))
+
+    def score(self, *args, **kwargs):
+        return 0

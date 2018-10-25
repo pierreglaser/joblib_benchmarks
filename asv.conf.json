@@ -21,15 +21,12 @@
     // Customizable commands for building, installing, and
     // uninstalling the project. See asv.conf.json documentation.
     //
-    //     "install_command":
-    // ["python -mpip install {wheel_file}"],
-    // 
-    // "uninstall_command":
-    // ["return-code=any python -mpip uninstall -y {project}"],
-    // 
-    // "build_command":
-    // ["python setup.py build",
-    //  "PIP_NO_BUILD_ISOLATION=false python -mpip wheel --no-deps --no-index -w {build_cache_dir} {build_dir}"],
+       //"install_command": ["python -mpip install -e {wheel_file}"],
+       "install_command": [],
+       "uninstall_command": [],
+       "build_command": [
+        "python -mpip install -e {build_dir}",
+       ],
 
     // List of branches to benchmark. If not provided, defaults to "master"
     // (for git) or "default" (for mercurial).
@@ -80,6 +77,11 @@
     //
     "matrix": {
          "numpy": [],
+         //"pip+scikit-learn": [""],
+         "pip+git+https://github.com/scikit-learn/scikit-learn.git": [],
+         "pip+cloudpickle": [],
+         "cython": [],
+         "scipy": [],
     },
 
     // Combinations of libraries/python versions can be excluded/included
