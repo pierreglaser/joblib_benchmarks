@@ -27,7 +27,7 @@ class TwentyDataBench(SklearnBenchmark):
     param_names = ['backend', 'pickler', 'n_jobs']
     params = (['multiprocessing', 'loky', 'threading'][1:],
               ['', 'cloudpickle'],
-              [1, 2])
+              [1, 2, 4])
 
     def setup(self, backend, pickler, n_jobs):
         super(TwentyDataBench, self).setup(backend, pickler)
@@ -47,7 +47,12 @@ class TwentyDataBench(SklearnBenchmark):
                              ('clf', SGDClassifier())])
 
         cv = ShuffleSplit(n_splits=4, test_size=0.33)
-        with parallel_backend(backend=backend):
+        if n_jobs > 1:
+            with parallel_backend(backend=backend):
+                cross_val_score(pipeline, self.twenty_data.data,
+                                self.twenty_data.target, cv=cv,
+                                n_jobs=n_jobs)
+        else:
             cross_val_score(pipeline, self.twenty_data.data,
                             self.twenty_data.target, cv=cv,
                             n_jobs=n_jobs)
@@ -57,7 +62,7 @@ class CaliforniaHousingBench(SklearnBenchmark):
     param_names = ['backend', 'pickler', 'n_jobs']
     params = (['multiprocessing', 'loky', 'threading'][1:],
               ['', 'cloudpickle'],
-              [1, 2])
+              [1, 2, 4])
 
     def setup(self, backend, pickler, n_jobs):
         super(CaliforniaHousingBench, self).setup(backend, pickler)
@@ -78,7 +83,12 @@ class CaliforniaHousingBench(SklearnBenchmark):
             ('estimator', Ridge())])
         cv = ShuffleSplit(n_splits=4, test_size=0.3)
 
-        with parallel_backend(backend=backend):
+        if n_jobs > 1:
+            with parallel_backend(backend=backend):
+                cross_val_score(pipeline, self.california_data.data,
+                                self.california_data.target, cv=cv,
+                                n_jobs=n_jobs)
+        else:
             cross_val_score(pipeline, self.california_data.data,
                             self.california_data.target, cv=cv,
                             n_jobs=n_jobs)
@@ -88,12 +98,12 @@ class MakeRegressionDataBench(SklearnBenchmark):
     param_names = ['backend', 'pickler', 'n_jobs', 'n_samples', 'n_features']
     params = (['multiprocessing', 'loky', 'threading'][1:],
               ['', 'cloudpickle'],
-              [1, 2],
+              [1, 2, 4],
               [10000, 30000],
               [10])
 
     def setup(self, backend, pickler, n_jobs, n_samples, n_features):
-        super(BackendSuiteRegression, self).setup(backend, pickler)
+        super(MakeRegressionDataBench, self).setup(backend, pickler)
         from sklearn.datasets import make_regression
         X, y = make_regression(n_samples, n_features)
         self.X = X
@@ -102,7 +112,11 @@ class MakeRegressionDataBench(SklearnBenchmark):
     def time_send_list(self, backend, pickler, n_jobs, n_samples, n_features):
         from joblib import delayed, parallel_backend, Parallel
 
-        with parallel_backend(backend=backend):
+        if n_jobs > 1:
+            with parallel_backend(backend=backend):
+                Parallel(n_jobs=n_jobs)(delayed(lambda x: x)(
+                    list(range(100000))) for _ in range(self.n_tasks))
+        else:
             Parallel(n_jobs=n_jobs)(delayed(lambda x: x)(
                 list(range(100000))) for _ in range(self.n_tasks))
 
@@ -123,7 +137,11 @@ class MakeRegressionDataBench(SklearnBenchmark):
         r = EstimatorWithLargeList()
         params = {'alpha': [1, 0.1, 0.001]}
 
-        with parallel_backend(backend):
+        if n_jobs > 1:
+            with parallel_backend(backend):
+                g = GridSearchCV(r, params, cv=4, n_jobs=n_jobs)
+                g.fit(self.X, self.y)
+        else:
             g = GridSearchCV(r, params, cv=4, n_jobs=n_jobs)
             g.fit(self.X, self.y)
 
@@ -133,11 +151,24 @@ class MakeRegressionDataBench(SklearnBenchmark):
         from sklearn.model_selection import GridSearchCV
         from joblib import parallel_backend
 
-        params = {'alpha': [2**-i for i in range(1, 10)]}
+        params = {'alpha': [2**-i for i in range(1, 20)]}
         ridge = Ridge()
-        with parallel_backend(backend=backend):
-            rcv = GridSearchCV(ridge, params, cv=4, n_jobs=n_jobs)
+        if n_jobs > 1:
+            with parallel_backend(backend=backend):
+                rcv = GridSearchCV(ridge, params, cv=10, n_jobs=n_jobs)
+                rcv.fit(self.X, self.y)
+        else:
+            rcv = GridSearchCV(ridge, params, cv=10, n_jobs=n_jobs)
             rcv.fit(self.X, self.y)
+    time_ridge_gridsearch.param_names = [
+            'backend', 'pickler', 'n_jobs', 'n_samples', 'n_features']
+    time_ridge_gridsearch.params = (
+            ['multiprocessing', 'loky', 'threading'][1:],
+            ['', 'cloudpickle'],
+            [1, 2, 4],
+            # ridge is very fast, so use larger datasets
+            [100000, 300000],
+            [10])
 
     def time_randomforest(self, backend, pickler, n_jobs, n_samples,
                           n_features):
@@ -145,12 +176,16 @@ class MakeRegressionDataBench(SklearnBenchmark):
         from sklearn.model_selection import GridSearchCV
         from joblib import parallel_backend
 
-        with parallel_backend(backend):
+        if n_jobs > 1:
+            with parallel_backend(backend):
+                rf = RandomForestRegressor(n_estimators=100, n_jobs=n_jobs)
+                rf.fit(self.X, self.y)
+        else:
             rf = RandomForestRegressor(n_estimators=100, n_jobs=n_jobs)
             rf.fit(self.X, self.y)
 
-    def time_scaler_kernelridge_pipeline(self, backend, pickle, n_samples,
-                                         n_features):
+    def time_scaler_kernelridge_pipeline(self, backend, pickle, n_jobs,
+                                         n_samples, n_features):
         from sklearn.pipeline import Pipeline
         from sklearn.preprocessing import StandardScaler
         from sklearn.kernel_ridge import KernelRidge
@@ -161,7 +196,18 @@ class MakeRegressionDataBench(SklearnBenchmark):
         pipeline = Pipeline([('scaler', StandardScaler()),
                              ('estimator', KernelRidge())])
 
-        cv = ShuffleSplit(n_splits=4, test_size=0.3)
+        cv = ShuffleSplit(n_splits=8, test_size=0.3)
 
-        with parallel_backend(backend=backend):
+        if n_jobs > 1:
+            with parallel_backend(backend=backend):
+                cross_val_score(pipeline, self.X, self.y, cv=cv, n_jobs=n_jobs)
+        else:
             cross_val_score(pipeline, self.X, self.y, cv=cv, n_jobs=n_jobs)
+    time_scaler_kernelridge_pipeline.param_names = [
+            'backend', 'pickler', 'n_jobs', 'n_samples', 'n_features']
+    time_scaler_kernelridge_pipeline.params = (
+            ['multiprocessing', 'loky', 'threading'][1:],
+            ['', 'cloudpickle'],
+            [1, 2, 4],
+            [10000],
+            [10])
