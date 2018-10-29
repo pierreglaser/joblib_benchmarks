@@ -162,15 +162,6 @@ class MakeRegressionDataBench(SklearnBenchmark):
         else:
             rcv = GridSearchCV(ridge, params, cv=50, n_jobs=n_jobs)
             rcv.fit(self.X, self.y)
-    time_ridge_gridsearch.param_names = [
-            'backend', 'pickler', 'n_jobs', 'n_samples', 'n_features']
-    time_ridge_gridsearch.params = (
-            ['multiprocessing', 'loky', 'threading'][1:],
-            ['', 'cloudpickle'],
-            [1, 2, 4],
-            # ridge is very fast, so use larger datasets
-            [10000, 30000],
-            [10])
 
     def time_randomforest(self, backend, pickler, n_jobs, n_samples,
                           n_features):
