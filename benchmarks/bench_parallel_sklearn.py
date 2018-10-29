@@ -12,6 +12,7 @@ class SklearnBenchmark:
     repeat = 1
     warmup_time = 0
     timer = timeit.default_timer
+    timeout = 120
 
     # non-asv class attributes
     n_tasks = 10
