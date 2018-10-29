@@ -151,7 +151,7 @@ class MakeRegressionDataBench(SklearnBenchmark):
         from sklearn.model_selection import GridSearchCV
         from joblib import parallel_backend
 
-        params = {'alpha': [2**-i for i in range(1, 20)]}
+        params = {'alpha': [2**-i for i in range(1, 40)]}
         ridge = Ridge()
         if n_jobs > 1:
             with parallel_backend(backend=backend):
