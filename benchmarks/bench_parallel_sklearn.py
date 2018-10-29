@@ -154,12 +154,13 @@ class MakeRegressionDataBench(SklearnBenchmark):
 
         params = {'alpha': [2**-i for i in range(1, 40)]}
         ridge = Ridge()
+        # Use a large cv value because ridge is very fast
         if n_jobs > 1:
             with parallel_backend(backend=backend):
-                rcv = GridSearchCV(ridge, params, cv=10, n_jobs=n_jobs)
+                rcv = GridSearchCV(ridge, params, cv=50, n_jobs=n_jobs)
                 rcv.fit(self.X, self.y)
         else:
-            rcv = GridSearchCV(ridge, params, cv=10, n_jobs=n_jobs)
+            rcv = GridSearchCV(ridge, params, cv=50, n_jobs=n_jobs)
             rcv.fit(self.X, self.y)
     time_ridge_gridsearch.param_names = [
             'backend', 'pickler', 'n_jobs', 'n_samples', 'n_features']
@@ -168,7 +169,7 @@ class MakeRegressionDataBench(SklearnBenchmark):
             ['', 'cloudpickle'],
             [1, 2, 4],
             # ridge is very fast, so use larger datasets
-            [100000, 300000],
+            [10000, 30000],
             [10])
 
     def time_randomforest(self, backend, pickler, n_jobs, n_samples,
