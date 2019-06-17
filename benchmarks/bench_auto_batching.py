@@ -6,6 +6,7 @@
 # Author: Pierre Glaser
 """Benchmarking the inpact of joblib's task batching strategy"""
 import tempfile
+import time
 
 from joblib import Parallel, delayed
 import numpy as np
@@ -21,7 +22,7 @@ def bench_short_tasks(
     verbose=True,
     input_data_size=0,
     output_data_size=0,
-    backend=None,
+    backend="loky",
     memmap_input=False,
     eta=None
 ):
@@ -57,29 +58,30 @@ def bench_short_tasks(
             # call that, among other things, reset the effective_batch_size of
             # the backend to 1.
 
+            t0 = time.time()
             p(
                 delayed(sleep_noop)(max(t, 0), input_data, output_data_size)
                 for t in task_times
             )
+            total_time = time.time() - t0
 
-            batch_sizes = p._backend._batch_info
+            batch_infos = p._backend._batch_info
 
         # compute compute time per batch. If the batch size selection algorithm
         # is good and the compute time of each task is not too chaotic, this
         # compute time should stabilize between MIN_BATCH_DURATION and
         # MAX_BATCH_DURATION.
-        # batch_durations = []
-        # first_task_idx = 0
-        # for bs in batch_sizes:
-        #     last_task_idx = first_task_idx + bs
-        #     print(task_times[first_task_idx:last_task_idx])
-        #     batch_duration = sum(task_times[first_task_idx:last_task_idx])
-        #     batch_durations.append(batch_duration)
-        #     first_task_idx = last_task_idx
+        batch_durations = []
+        first_task_idx = 0
+        batch_infos = sorted(batch_infos, key=lambda x: x[0])
+        for info in batch_infos:
+            batch_size = info[1]
+            last_task_idx = first_task_idx + info[1]
+            batch_duration = sum(task_times[first_task_idx:last_task_idx])
+            info.append(batch_duration)
+            first_task_idx = last_task_idx
 
-    # return batch_sizes, batch_durations
-    # print(batch_sizes)
-    return batch_sizes
+    return (batch_infos, total_time)
 
 
 class AutoBatchingSuite(Benchmark):
@@ -88,17 +90,17 @@ class AutoBatchingSuite(Benchmark):
     warmup_time = 0
 
     param_names = ["size", "eta"]
-    params = ([10000, 100000, 1000000][:1], [0, 1][-1:])
+    params = ([10000, 100000, 1000000][:1], [1, 0.8, 0.5, 0.2][1:2])
     bench_parameters = dict(
         output_data_size=int(1e5),  # output data size in bytes
-        n_jobs=2,
+        n_jobs=4,
         verbose=10,
     )
 
     def setup(self, size, eta):
         random_state = np.random.RandomState(42)
         high_variance = np.abs(
-            random_state.normal(loc=0.000001, scale=0.001, size=5000)
+            random_state.normal(loc=0.000001, scale=0.01, size=5000)
         )
 
         low_variance = np.empty_like(high_variance)
@@ -121,9 +123,9 @@ class AutoBatchingSuite(Benchmark):
         # the first ones are cached. Because for the cached task, the apparent
         # compute time will seem very small, joblib will increase a lot the
         # batch size, which will potentially make the workers starve.
-        self.partially_cached = [1e-3] * 20 + [1] * 100
+        self.partially_cached = [1e-3] * 200 + [1] * 50
 
-    def time_high_variance_no_trend(self, size):
+    def time_high_variance_no_trend(self, size, eta):
         bench_short_tasks(
             self.high_variance, **self.bench_parameters, input_data_size=size
         )
@@ -133,15 +135,17 @@ class AutoBatchingSuite(Benchmark):
         "time"
     )
 
-    def time_low_variance_no_trend(self, size):
+    def time_low_variance_no_trend(self, size, eta):
 
         bench_short_tasks(
-            self.low_variance, **self.bench_parameters, input_data_size=size
+            self.low_variance, **self.bench_parameters, input_data_size=size,
+            eta=eta
         )
 
-    def track_high_variance_no_trend(self, size):
+    def track_high_variance_no_trend(self, size, eta):
         return bench_short_tasks(
-            self.high_variance, **self.bench_parameters, input_data_size=size
+            self.high_variance, **self.bench_parameters, input_data_size=size,
+            eta=eta
         )
 
     track_high_variance_no_trend.pretty_name = (
@@ -149,9 +153,10 @@ class AutoBatchingSuite(Benchmark):
         " running time"
     )
 
-    def track_low_variance_no_trend(self, size):
+    def track_low_variance_no_trend(self, size, eta):
         return bench_short_tasks(
-            self.low_variance, **self.bench_parameters, input_data_size=size
+            self.low_variance, **self.bench_parameters, input_data_size=size,
+            eta=eta
         )
 
     track_low_variance_no_trend.pretty_name = (
@@ -169,11 +174,12 @@ class AutoBatchingSuite(Benchmark):
         " time"
     )
 
-    def track_partially_cached(self, size):
+    def track_partially_cached(self, size, eta):
         return bench_short_tasks(
             self.partially_cached,
             **self.bench_parameters,
-            input_data_size=size
+            input_data_size=size,
+            eta=eta
         )
 
     track_partially_cached.pretty_name = (
