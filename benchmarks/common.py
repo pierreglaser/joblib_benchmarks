@@ -22,6 +22,7 @@ call is run between two iterations of loop 2, in opposition with loop 5.
 
 """
 import os
+import time
 
 import numpy as np
 
@@ -78,3 +79,15 @@ def compute_eigen(arr):
     return np.linalg.svd(square_matrix)
 
 
+def sleep_noop(duration, input_data, output_data_size):
+    """Noop function to emulate real computation.
+
+    Simulate CPU time with by sleeping duration.
+
+    Induce overhead by accepting (and ignoring) any amount of data as input
+    and allocating a requested amount of data.
+
+    """
+    time.sleep(duration)
+    if output_data_size:
+        return np.ones(output_data_size, dtype=np.byte)
