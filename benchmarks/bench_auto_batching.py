@@ -16,15 +16,10 @@ from .common import Benchmark, sleep_noop
 
 def bench_short_tasks(
     task_times,
-    n_jobs=2,
-    batch_size="auto",
-    pre_dispatch="2*n_jobs",
-    verbose=True,
     input_data_size=0,
     output_data_size=0,
-    backend="loky",
     memmap_input=False,
-    eta=None
+    parallel_inst=None,
 ):
 
     with tempfile.NamedTemporaryFile() as temp_file:
@@ -44,15 +39,7 @@ def bench_short_tasks(
         else:
             input_data = None
 
-        with Parallel(
-            n_jobs=n_jobs,
-            verbose=verbose,
-            pre_dispatch=pre_dispatch,
-            batch_size=batch_size,
-            backend=backend,
-            max_nbytes=0,
-            eta=eta
-        ) as p:
+        with parallel_inst as p:
             # Call the Parallel object from a context_manager to manage the
             # backend ourselves and skip cleanup rountines at the end of the
             # call that, among other things, reset the effective_batch_size of
@@ -91,10 +78,14 @@ class AutoBatchingSuite(Benchmark):
 
     param_names = ["size", "eta"]
     params = ([10000, 100000, 1000000][:1], [1, 0.8, 0.5, 0.2][1:2])
-    bench_parameters = dict(
-        output_data_size=int(1e5),  # output data size in bytes
+    parallel_parameters = dict(
         n_jobs=4,
         verbose=10,
+        backend="loky",
+        pre_dispatch="2*n_jobs",
+    )
+    bench_parameters = dict(
+        output_data_size=int(1e5),  # output data size in bytes,
     )
 
     def setup(self, size, eta):
@@ -116,7 +107,7 @@ class AutoBatchingSuite(Benchmark):
         # oscillate too much and still approximately have the same total run
         # time.
         slow_time = 0.2
-        positive_wave = np.cos(np.linspace(0, 2 * np.pi, 1000)) ** 8
+        positive_wave = np.cos(np.linspace(0, 6 * np.pi, 2000)) ** 8
         self.cyclic = positive_wave * slow_time
 
         # Simulate a situation where a few long tasks have to be executed, and
@@ -125,9 +116,18 @@ class AutoBatchingSuite(Benchmark):
         # batch size, which will potentially make the workers starve.
         self.partially_cached = [1e-3] * 200 + [1] * 50
 
+        self.parallel = Parallel(eta=eta, **self.parallel_parameters)
+
+        # warm up executor
+        self.parallel(delayed(time.sleep)(0.001) for _ in
+                      range(2*self.parallel_parameters['n_jobs']))
+
     def time_high_variance_no_trend(self, size, eta):
         bench_short_tasks(
-            self.high_variance, **self.bench_parameters, input_data_size=size
+            self.high_variance,
+            parallel_inst=self.parallel,
+            input_data_size=size,
+            **self.bench_parameters
         )
 
     time_high_variance_no_trend.pretty_name = (
@@ -136,16 +136,18 @@ class AutoBatchingSuite(Benchmark):
     )
 
     def time_low_variance_no_trend(self, size, eta):
-
         bench_short_tasks(
-            self.low_variance, **self.bench_parameters, input_data_size=size,
-            eta=eta
+            self.low_variance,
+            parallel_inst=self.parallel,
+            input_data_size=size,
         )
 
     def track_high_variance_no_trend(self, size, eta):
         return bench_short_tasks(
-            self.high_variance, **self.bench_parameters, input_data_size=size,
-            eta=eta
+            self.high_variance,
+            parallel_inst=self.parallel,
+            input_data_size=size,
+            **self.bench_parameters
         )
 
     track_high_variance_no_trend.pretty_name = (
@@ -155,8 +157,10 @@ class AutoBatchingSuite(Benchmark):
 
     def track_low_variance_no_trend(self, size, eta):
         return bench_short_tasks(
-            self.low_variance, **self.bench_parameters, input_data_size=size,
-            eta=eta
+            self.low_variance,
+            input_data_size=size,
+            parallel_inst=self.parallel,
+            **self.bench_parameters
         )
 
     track_low_variance_no_trend.pretty_name = (
@@ -166,7 +170,10 @@ class AutoBatchingSuite(Benchmark):
 
     def track_cyclic_trend(self, size, eta):
         return bench_short_tasks(
-            self.cyclic, **self.bench_parameters, input_data_size=size, eta=eta
+            self.cyclic,
+            input_data_size=size,
+            parallel_inst=self.parallel,
+            **self.bench_parameters
         )
 
     track_cyclic_trend.pretty_name = (
@@ -177,9 +184,9 @@ class AutoBatchingSuite(Benchmark):
     def track_partially_cached(self, size, eta):
         return bench_short_tasks(
             self.partially_cached,
-            **self.bench_parameters,
             input_data_size=size,
-            eta=eta
+            parallel_inst=self.parallel,
+            **self.bench_parameters
         )
 
     track_partially_cached.pretty_name = (
