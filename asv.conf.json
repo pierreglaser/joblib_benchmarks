@@ -33,7 +33,7 @@
 
     // List of branches to benchmark. If not provided, defaults to "master"
     // (for git) or "default" (for mercurial).
-       "branches": ["master"], // for git
+       "branches": ["use-current-batch-size-report-only", "master-slow-increase", "synchronize-batch-operations", "synchronized-slow-increase"],
     // "branches": ["default"],    // for mercurial
 
     // The DVCS being used.  If not set, it will be automatically

@@ -76,10 +76,9 @@ class AutoBatchingSuite(Benchmark):
     number = 1
     warmup_time = 0
 
-    param_names = ["size", "eta"]
-    params = ([10000, 100000, 1000000][:1], [1, 0.8, 0.5, 0.2][1:2])
+    param_names = ["size", "eta", "n_jobs"]
+    params = ([10000, 100000, 1000000][:1], [1, 0.8, 0.5, 0.2][1:2], [2, 4, 8])
     parallel_parameters = dict(
-        n_jobs=4,
         verbose=10,
         backend="loky",
         pre_dispatch="2*n_jobs",
@@ -88,7 +87,7 @@ class AutoBatchingSuite(Benchmark):
         output_data_size=int(1e5),  # output data size in bytes,
     )
 
-    def setup(self, size, eta):
+    def setup(self, size, eta, n_jobs):
         random_state = np.random.RandomState(42)
         high_variance = np.abs(
             random_state.normal(loc=0.000001, scale=0.01, size=5000)
@@ -116,13 +115,13 @@ class AutoBatchingSuite(Benchmark):
         # batch size, which will potentially make the workers starve.
         self.partially_cached = [1e-3] * 200 + [1] * 50
 
-        self.parallel = Parallel(eta=eta, **self.parallel_parameters)
+        self.parallel = Parallel(eta=eta, n_jobs=n_jobs,
+                                 **self.parallel_parameters)
 
         # warm up executor
-        self.parallel(delayed(time.sleep)(0.001) for _ in
-                      range(2*self.parallel_parameters['n_jobs']))
+        self.parallel(delayed(time.sleep)(0.001) for _ in range(10*n_jobs))
 
-    def time_high_variance_no_trend(self, size, eta):
+    def time_high_variance_no_trend(self, size, eta, n_jobs):
         bench_short_tasks(
             self.high_variance,
             parallel_inst=self.parallel,
@@ -135,14 +134,14 @@ class AutoBatchingSuite(Benchmark):
         "time"
     )
 
-    def time_low_variance_no_trend(self, size, eta):
+    def time_low_variance_no_trend(self, size, eta, n_jobs):
         bench_short_tasks(
             self.low_variance,
             parallel_inst=self.parallel,
             input_data_size=size,
         )
 
-    def track_high_variance_no_trend(self, size, eta):
+    def track_high_variance_no_trend(self, size, eta, n_jobs):
         return bench_short_tasks(
             self.high_variance,
             parallel_inst=self.parallel,
@@ -155,7 +154,7 @@ class AutoBatchingSuite(Benchmark):
         " running time"
     )
 
-    def track_low_variance_no_trend(self, size, eta):
+    def track_low_variance_no_trend(self, size, eta, n_jobs):
         return bench_short_tasks(
             self.low_variance,
             input_data_size=size,
@@ -168,7 +167,7 @@ class AutoBatchingSuite(Benchmark):
         " running time"
     )
 
-    def track_cyclic_trend(self, size, eta):
+    def track_cyclic_trend(self, size, eta, n_jobs):
         return bench_short_tasks(
             self.cyclic,
             input_data_size=size,
@@ -181,7 +180,7 @@ class AutoBatchingSuite(Benchmark):
         " time"
     )
 
-    def track_partially_cached(self, size, eta):
+    def track_partially_cached(self, size, eta, n_jobs):
         return bench_short_tasks(
             self.partially_cached,
             input_data_size=size,
