@@ -16,5 +16,5 @@
 # done
 
 for branch in default-batching-strategy; do
-	asv run -ev -b bench_auto_batching.AutoBatchingSuite.track_l ${branch}^!
+	asv run -ev -b bench_auto_batching.PartiallyCachedBenchmark.track_p ${branch}^!
 done

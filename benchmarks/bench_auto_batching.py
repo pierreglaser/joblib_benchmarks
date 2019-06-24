@@ -77,14 +77,16 @@ class AutoBatchingSuite(Benchmark):
     warmup_time = 0
 
     param_names = ["size", "eta", "n_jobs"]
-    params = ([10000, 100000, 1000000][:1], [1, 0.8, 0.5, 0.2][1:2], [2, 4, 8])
+    params = (
+        [10000, 100000, 1000000][:1],
+        [1, 0.8, 0.5, 0.2][1:2],
+        [2, 4, 8][:1],
+    )
     parallel_parameters = dict(
-        verbose=10,
-        backend="loky",
-        pre_dispatch="2*n_jobs",
+        verbose=10, backend="loky", pre_dispatch="2*n_jobs"
     )
     bench_parameters = dict(
-        output_data_size=int(1e5),  # output data size in bytes,
+        output_data_size=int(1e5)  # output data size in bytes,
     )
 
     def setup(self, size, eta, n_jobs):
@@ -115,11 +117,12 @@ class AutoBatchingSuite(Benchmark):
         # batch size, which will potentially make the workers starve.
         self.partially_cached = [1e-3] * 200 + [1] * 50
 
-        self.parallel = Parallel(eta=eta, n_jobs=n_jobs,
-                                 **self.parallel_parameters)
+        self.parallel = Parallel(
+            eta=eta, n_jobs=n_jobs, **self.parallel_parameters
+        )
 
         # warm up executor
-        self.parallel(delayed(time.sleep)(0.001) for _ in range(2*n_jobs))
+        self.parallel(delayed(time.sleep)(0.001) for _ in range(2 * n_jobs))
 
     def time_high_variance_no_trend(self, size, eta, n_jobs):
         bench_short_tasks(
@@ -187,6 +190,28 @@ class AutoBatchingSuite(Benchmark):
             parallel_inst=self.parallel,
             **self.bench_parameters
         )
+
+
+class PartiallyCachedBenchmark(AutoBatchingSuite):
+    params = (
+        [10000, 100000, 1000000][:1],
+        [1, 0.8, 0.5, 0.2][1:2],
+        [2, 4, 8][:1],
+        [10, 50, 100, 200]
+    )
+    param_names = ["size", "eta", "n_jobs", "n_cached"]
+
+    def track_partially_cached(self, size, eta, n_jobs, n_cached):
+        return bench_short_tasks(
+            self.partially_cached,
+            input_data_size=size,
+            parallel_inst=self.parallel,
+            **self.bench_parameters
+        )
+
+    def setup(self, size, eta, n_jobs, n_cached):
+        super().setup(size, eta, n_jobs)
+        self.partially_cached = [1e-3] * n_cached + [1] * 50
 
     track_partially_cached.pretty_name = (
         "effective batch size when running long task, with the first ones"
