@@ -192,7 +192,7 @@ class AutoBatchingSuite(Benchmark):
         )
 
 
-class PartiallyCachedBenchmark:
+class PartiallyCachedBenchmark(Benchmark):
     params = (
         [10000, 100000, 1000000][:1],
         [1, 0.8, 0.5, 0.2][1:2],
