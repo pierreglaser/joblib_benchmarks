@@ -119,7 +119,7 @@ class AutoBatchingSuite(Benchmark):
                                  **self.parallel_parameters)
 
         # warm up executor
-        self.parallel(delayed(time.sleep)(0.001) for _ in range(10*n_jobs))
+        self.parallel(delayed(time.sleep)(0.001) for _ in range(2*n_jobs))
 
     def time_high_variance_no_trend(self, size, eta, n_jobs):
         bench_short_tasks(

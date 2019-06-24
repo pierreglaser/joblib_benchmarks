@@ -108,7 +108,7 @@ bench_name_to_sequence_name_map = {
 }
 
 BENCH_INST = AutoBatchingSuite()
-BENCH_INST.setup(10000, 0.8)  # parameters do not influence tasks running time
+BENCH_INST.setup(10000, 0.8, 4)  # parameters dont influence tasks running time
 
 
 def aggregate_benchmark_dataframes():
