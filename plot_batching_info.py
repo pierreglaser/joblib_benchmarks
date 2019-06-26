@@ -1,13 +1,13 @@
 import pathlib
 
-import matplotlib as mpl
-import pandas as pd
-import matplotlib.pyplot as plt
 import git
-from asv.config import Config
-
 from asv_to_pandas import create_benchmark_dataframe
 from benchmarks.bench_auto_batching import AutoBatchingSuite
+
+import matplotlib as mpl
+import matplotlib.pyplot as plt
+import pandas as pd
+from asv.config import Config
 
 params = {
     "axes.titlesize": 24,
@@ -24,6 +24,9 @@ asv_config = Config.load()
 joblib_repo = git.Repo(asv_config.repo)
 benchmark_suite_dir = pathlib.Path(__file__).parent
 plots_path = pathlib.Path(benchmark_suite_dir) / "plots"
+tasks_times_hists_path = plots_path / "task_times_hists"
+bench_perf_path = plots_path / "bench_performance"
+time_compare_path = plots_path / "comparison_plots"
 
 BENCHMARK_INFO_COLS = [
     "batch_idx",
@@ -49,9 +52,12 @@ branches = [
     "default-batching-strategy",
     "default-slow-increase",
     "default-slow-increase-fast-decrease",
+    "default-slow-increase-fast-decrease-split-last-batch",
     "most-recent-batch-slow-increase",
     "most-recent-batch-slow-increase-fast-decrease",
     "most-recent-batch-slow-increase-fast-decrease-end-to-end-duration",
+    "use-all-batches-slow-increase-fast-decrease",
+    "no-starving",
 ]
 
 hash_to_branch_map = {}
@@ -91,6 +97,13 @@ branch_tags_map = {
         "fast",
         "end-to-end",
     ],  # noqa
+    "use-all-batches-slow-increase-fast-decrease": [
+        True,
+        "slow",
+        "fast",
+        "end-to-end",
+    ],  # noqa
+    "no-starving": [True, "slow", "fast", "compute-time"],  # noqa
 }
 
 benchmark_names = [
@@ -111,8 +124,8 @@ BENCH_INST = AutoBatchingSuite()
 BENCH_INST.setup(10000, 0.8, 4)  # parameters dont influence tasks running time
 
 
-def aggregate_benchmark_dataframes():
-    df = create_benchmark_dataframe(group_by="file")["bench_auto_batching"]
+def aggregate_benchmark_dataframes(name):
+    df = create_benchmark_dataframe(group_by="class")[name]
 
     # each line of df contains an array of batch size records
     batch_info_dfs = {}
@@ -120,6 +133,7 @@ def aggregate_benchmark_dataframes():
 
     for bench_metadata, batch_info in df.iteritems():
         batch_info, total_time = batch_info
+
         batch_info_df = pd.DataFrame(batch_info, columns=BENCHMARK_INFO_COLS)
         batch_info_dfs[bench_metadata] = batch_info_df
 
@@ -136,7 +150,7 @@ def aggregate_benchmark_dataframes():
         .set_index("commit_hash", append=True)
     )
     batch_info_dfs = batch_info_dfs.reset_index(
-        ["version", "date", "class", "type"], drop=True
+        ["version", "date", "file", "type"], drop=True
     )
 
     time_df = (
@@ -145,7 +159,7 @@ def aggregate_benchmark_dataframes():
         .set_index("commit_hash", append=True)
     )
     time_df = time_df.reset_index(
-        ["version", "date", "class", "type"], drop=True
+        ["version", "date", "file", "type"], drop=True
     )
     return batch_info_dfs, time_df
 
@@ -298,11 +312,166 @@ def _format_figure_text(time, branch_name):
     return extra_text
 
 
+def plot_task_time_distribution(df, name, commit_hash):
+    f, axs = plt.subplots(figsize=(12, 8), nrows=2, ncols=1, sharex=True)
+    # f.suptitle(f"benchmark {name}, using {commit_hash}")
+    titles = {0: "task times", 1: "task times used to compute the batch size"}
+    df = df.xs([name, commit_hash], level=["name", "commit_hash"])
+    for (n, g), ax in zip(df.groupby("used_to_compute_bs"), axs):
+        ax.set_yscale("log")
+        ax.set_title(titles[n])
+        g["total_duration"].reset_index(drop=True).plot.hist(ax=ax)
+
+    plot_dir = tasks_times_hists_path / name
+    plot_dir.mkdir(exist_ok=True, parents=True)
+    f.savefig(plot_dir / f"{name}.png", dpi=f.dpi)
+
+
+def compare_benchmark_performance(df, branch_one, branch_two, bench_name):
+    f, ax = plt.subplots(figsize=(12, 8))
+    ax.set_xlabel("n_jobs")
+    ax.set_ylabel("total time")
+
+    df = df.reset_index("n_jobs")
+    df["n_jobs"] = df["n_jobs"].astype(int)
+    df = df.set_index("n_jobs", append=True)
+    df = df["time"].loc[
+        (
+            bench_name,
+            slice(None),
+            slice(None),
+            [branch_one, branch_two],
+            slice(None),
+        )
+    ]
+    df = df.unstack(level="commit_hash").reset_index(
+        level=["name", "size", "eta"], drop=True
+    )
+    df.plot.bar(ax=ax)
+    plot_dir = bench_perf_path / bench_name
+    plot_dir.mkdir(exist_ok=True, parents=True)
+    f.savefig(plot_dir / f"{bench_name}.png", dpi=f.dpi)
+
+
+def show_partially_cached_improvment(
+    bench_class, bench_name, benchmarked_branch, base_branch
+):
+    batch_df, time_df = aggregate_benchmark_dataframes(bench_class)
+    time_df = time_df.xs(bench_name, level="name", drop_level=False)
+    batch_df = batch_df.xs(bench_name, level="name", drop_level=False)
+
+    time_df = (
+        time_df["time"]
+        .unstack("commit_hash")
+        .reset_index(["name", "size", "eta"], drop=True)
+    )
+    best_parallel_time_df = (
+        batch_df.xs(benchmarked_branch, level="commit_hash")
+        .groupby("n_jobs")["compute_duration"]
+        .sum()
+    )
+    if base_branch == "best-case":
+        for n_jobs, total_time in best_parallel_time_df.iteritems():
+            best_parallel_time_df.loc[n_jobs] /= int(n_jobs)
+        time_df["best-case"] = best_parallel_time_df
+    # f, axs = plt.subplots(nrows=4, ncols=4, sharex=True, sharey=True)
+    # by_ncached = time_df.groupby('n_cached')
+    f, ax = plt.subplots(figsize=(12, 10))
+    c = time_df.index.get_level_values("n_jobs").astype(int)
+    if "n_cached" in time_df.index.names:
+        s = 30 + 2 * time_df.index.get_level_values("n_cached").astype(int)
+    else:
+        s = 200
+    pts = ax.scatter(
+        time_df[base_branch],
+        time_df[benchmarked_branch],
+        s=s,
+        c=c,
+        marker="o",
+        # cmap=cm.summer
+    )
+    ax.plot(
+        [0, time_df.max().max()],
+        [0, time_df.max().max()],
+        linewidth=1,
+        c="red",
+    )
+    ax.set_xlabel("total time ({})".format(base_branch))
+    ax.set_ylabel("total time ({})".format(benchmarked_branch))
+    ax.set_xlim(left=0)
+    ax.set_ylim(bottom=0)
+
+    cbar = f.colorbar(pts)
+    cbar.set_label("n_jobs")
+
+    if "n_cached" in time_df.index.names:
+        ax.text(
+            0.05,
+            0.9,
+            "number of uncached tasks: 50",
+            transform=ax.transAxes,
+            bbox=dict(alpha=0.1),
+        )
+
+        kw = dict(
+            prop="sizes",
+            num=4,
+            color=pts.cmap(0.7),
+            func=lambda s: (s - 30) / 2,
+        )
+        ax.legend(
+            *pts.legend_elements(**kw),
+            loc="lower right",
+            title="size of cache",
+        )
+    plot_dir = time_compare_path / "{}_vs_{}".format(
+        benchmarked_branch, base_branch
+    )
+    plot_dir.mkdir(exist_ok=True, parents=True)
+    f.savefig(plot_dir / bench_name, dpi=f.dpi)
+
+    # for i, (n_cached, df) in enumerate(by_ncached):
+    #     by_njobs = df.groupby('n_jobs')
+    #     for j, (n_jobs, g) in enumerate(by_njobs):
+    #         assert len(g) == 1
+    #         g.iloc[0].reset_index(drop=True).plot.bar(ax=axs[i, j])
+
+
 if __name__ == "__main__":
-    batch_df, time_df = aggregate_benchmark_dataframes()
+    # batch_df, time_df = aggregate_benchmark_dataframes(
+    #     "PartiallyCachedBenchmark"
+    # )
+    batch_df, time_df = aggregate_benchmark_dataframes("AutoBatchingSuite")
+    # for bench_name in bench_name_to_sequence_name_map.keys():
+    #     show_partially_cached_improvment(
+    #         "AutoBatchingSuite",
+    #         bench_name,
+    #         "no-starving",
+    #         "default-batching-strategy",
+    #         # "best-case",
+    #     )
+    # batch_df, time_df = aggregate_benchmark_dataframes("AutoBatchingSuite")
+    # compare_benchmark_performance(
+    #     time_df,
+    #     "default-batching-strategy",
+    #     "default-slow-increase-fast-decrease",
+    #     "track_cyclic_trend",
+    # )
+
+    # plot_task_time_distribution(
+    #     batch_df, "track_cyclic_trend", "default-batching-strategy"
+    # )
+    # some_df = (
+    #     batch_df.xs(
+    #         ["2", "default-batching-strategy", "track_cyclic_trend"],
+    #         level=["n_jobs", "commit_hash", "name"],
+    #     )
+    #     .reset_index(drop=True)
+    #     .set_index("batch_idx")
+    # )
 
     batch_df = batch_df.xs(
-        "default-batching-strategy", level="commit_hash", drop_level=False
+        "no-starving", level="commit_hash", drop_level=False
     )
 
     # batch_df_dev, batch_df_master = compare(
@@ -315,20 +484,25 @@ if __name__ == "__main__":
     # )
 
     by_batch_branch_and_benchmark = batch_df.groupby(
-        ["commit_hash", "name"], axis=0
+        ["commit_hash", "name", "n_jobs"], axis=0
     )
 
     for name, single_bench_df in by_batch_branch_and_benchmark:
-        branch_name, bench_name = name
-        if bench_name != "track_low_variance_no_trend":
+        branch_name, bench_name, n_jobs = name
+        if n_jobs != "2":
             continue
+        # if bench_name != "track_low_variance_no_trend":
+        #     continue
         df_mean, df_cumsum = reformat_single_benchmark_dataframe(
             single_bench_df, bench_name=bench_name
         )
-        title = "{}\n(branch: {})".format(bench_name, branch_name)
+        title = "{}\n(branch: {}, n_jobs: {})".format(
+            bench_name, branch_name, n_jobs
+        )
 
         total_time_records = time_df.time.xs(
-            [branch_name, bench_name], level=["commit_hash", "name"]
+            [branch_name, bench_name, n_jobs],
+            level=["commit_hash", "name", "n_jobs"],
         )
 
         assert (
@@ -346,4 +520,4 @@ if __name__ == "__main__":
         )
         plot_dir = plots_path / bench_name
         plot_dir.mkdir(exist_ok=True)
-        f.savefig(plot_dir / f"{branch_name}.png", dpi=f.dpi)
+        f.savefig(plot_dir / f"{branch_name}_{n_jobs}.png", dpi=f.dpi)

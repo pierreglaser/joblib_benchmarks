@@ -15,6 +15,14 @@
 # 	asv run -e -b bench_auto_batching.AutoBatchingSuite.track_c ${branch}^!
 # done
 
-for branch in default-batching-strategy; do
-	asv run -ev -b bench_auto_batching.PartiallyCachedBenchmark.track_p ${branch}^!
+# for branch in default-batching-strategy; do
+# 	asv run -ev -b bench_auto_batching.PartiallyCachedBenchmark.track_p ${branch}^!
+# done
+
+for branch in no-starving; do
+	asv run -ev -b bench_auto_batching.AutoBatchingSuite.track_ ${branch}^!
 done
+
+# for branch in default-batching-strategy; do
+# 	asv run -ev -b bench_auto_batching.AutoBatchingSuite.track_l ${branch}^!
+# done

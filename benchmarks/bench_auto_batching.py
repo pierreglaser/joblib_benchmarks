@@ -196,8 +196,8 @@ class PartiallyCachedBenchmark(Benchmark):
     params = (
         [10000, 100000, 1000000][:1],
         [1, 0.8, 0.5, 0.2][1:2],
-        [2, 4, 8][:1],
-        [10, 50, 100, 200]
+        [2, 4, 8][1:2],
+        [10, 50, 100, 200][-1:]
     )
     param_names = ["size", "eta", "n_jobs", "n_cached"]
 
