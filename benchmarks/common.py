@@ -50,6 +50,14 @@ class Benchmark:
     def __init__(self):
         pass
 
+    @classmethod
+    def get_bench_names(cls, type_):
+        bench_names = []
+        for attr_name in (cls.__dict__):
+            if attr_name.startswith(type_):
+                bench_names.append(attr_name)
+        return bench_names
+
 
 # Small helper functions as it is not possible to create basic instances of
 # list/dict of a specific size using a single function call

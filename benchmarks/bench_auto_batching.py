@@ -7,11 +7,58 @@
 """Benchmarking the inpact of joblib's task batching strategy"""
 import tempfile
 import time
+import itertools
 
 from joblib import Parallel, delayed
+import pandas as pd
 import numpy as np
 
 from .common import Benchmark, sleep_noop
+
+
+def get_ideal_parallel_running_times(benchmark_class):
+    """Compute ideal benchmark running time given a number of workers"""
+    klass = globals()[benchmark_class]
+    bench_names = klass.get_bench_names(type_="track")
+    ideal_running_times = []
+    n_jobs_idx = klass.param_names.index('n_jobs')
+    for bench_name in bench_names:
+        tasks = get_task_profile(benchmark_class, bench_name)
+        serial_running_time = sum(tasks)
+        for params in itertools.product(*klass.params):
+            parallel_time = serial_running_time / params[n_jobs_idx]
+            ideal_running_times.append(
+                [bench_name, "ideal_parallel_case", parallel_time,
+                 *params])
+
+    ideal_time_df = pd.DataFrame(
+        ideal_running_times, columns=['name', 'commit_hash', 'time',
+                                      *klass.param_names])
+    ideal_time_df.set_index(['name', 'commit_hash', *klass.param_names],
+                            inplace=True)
+    return ideal_time_df['time']
+
+
+def get_task_profile(benchmark_class, benchmark_name, **setup_kw):
+    klass = globals()[benchmark_class]
+    benchmark_instance = klass()
+    benchmark_instance.parallel_parameters['verbose'] = 0
+
+    default_setup_params = [p[0] for p in klass.params]
+    default_setup_params = dict(zip(klass.param_names, default_setup_params))
+    setup_kw.pop("commit_hash", None)  # unwanted argument
+    default_setup_params.update(setup_kw)
+    benchmark_instance.setup(**default_setup_params)
+    if benchmark_name == "track_high_variance_no_trend":
+        return benchmark_instance.high_variance
+    elif benchmark_name == "track_low_variance_no_trend":
+        return benchmark_instance.low_variance
+    elif benchmark_name == "track_cyclic_trend":
+        return benchmark_instance.cyclic
+    elif benchmark_name == "track_partially_cached":
+        return benchmark_instance.partially_cached
+    else:
+        raise ValueError("benchmark name {} not known".format(benchmark_name))
 
 
 def bench_short_tasks(
@@ -80,7 +127,7 @@ class AutoBatchingSuite(Benchmark):
     params = (
         [10000, 100000, 1000000][:1],
         [1, 0.8, 0.5, 0.2][1:2],
-        [2, 4, 8][:1],
+        [2, 4, 8, 16],
     )
     parallel_parameters = dict(
         verbose=10, backend="loky", pre_dispatch="2*n_jobs"
@@ -196,8 +243,8 @@ class PartiallyCachedBenchmark(Benchmark):
     params = (
         [10000, 100000, 1000000][:1],
         [1, 0.8, 0.5, 0.2][1:2],
-        [2, 4, 8][1:2],
-        [10, 50, 100, 200][-1:]
+        [2, 4, 8, 16],
+        [10, 50, 100, 200]
     )
     param_names = ["size", "eta", "n_jobs", "n_cached"]
 
