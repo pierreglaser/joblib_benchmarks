@@ -80,6 +80,7 @@
     //
     "matrix": {
          "numpy": [],
+         "pandas": [],
     },
 
     // Combinations of libraries/python versions can be excluded/included

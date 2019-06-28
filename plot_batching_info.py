@@ -58,6 +58,9 @@ branches = [
     "most-recent-batch-slow-increase-fast-decrease-end-to-end-duration",
     "use-all-batches-slow-increase-fast-decrease",
     "no-starving",
+    "no-starving-backend-agnostic",
+    "no-starving-backend-agnostic-split-last-batch",
+    "no-starving-backend-agnostic-split-last-batch-end-to-end-duration",
 ]
 
 hash_to_branch_map = {}
@@ -104,6 +107,24 @@ branch_tags_map = {
         "end-to-end",
     ],  # noqa
     "no-starving": [True, "slow", "fast", "compute-time"],  # noqa
+    "no-starving-backend-agnostic": [
+        True,
+        "slow",
+        "fast",
+        "compute-time",
+    ],  # noqa
+    "no-starving-backend-agnostic-split-last-batch": [
+        True,
+        "slow",
+        "fast",
+        "compute-time",
+    ],  # noqa
+    "no-starving-backend-agnostic-split-last-batch-end-to-end-duration": [
+        True,
+        "slow",
+        "fast",
+        "end-to-end",
+    ],  # noqa
 }
 
 benchmark_names = [
@@ -357,8 +378,9 @@ def show_partially_cached_improvment(
     bench_class, bench_name, benchmarked_branch, base_branch
 ):
     batch_df, time_df = aggregate_benchmark_dataframes(bench_class)
-    time_df = time_df.xs(bench_name, level="name", drop_level=False)
-    batch_df = batch_df.xs(bench_name, level="name", drop_level=False)
+    if bench_name != "all":
+        time_df = time_df.xs(bench_name, level="name", drop_level=False)
+        batch_df = batch_df.xs(bench_name, level="name", drop_level=False)
 
     time_df = (
         time_df["time"]
@@ -396,8 +418,8 @@ def show_partially_cached_improvment(
         linewidth=1,
         c="red",
     )
-    ax.set_xlabel("total time ({})".format(base_branch))
-    ax.set_ylabel("total time ({})".format(benchmarked_branch))
+    ax.set_xlabel("total time ({})".format(base_branch[:30]))
+    ax.set_ylabel("total time ({})".format(benchmarked_branch[:30]))
     ax.set_xlim(left=0)
     ax.set_ylim(bottom=0)
 
@@ -450,6 +472,13 @@ if __name__ == "__main__":
     #         "default-batching-strategy",
     #         # "best-case",
     #     )
+    show_partially_cached_improvment(
+        "AutoBatchingSuite",
+        "all",
+        "no-starving-backend-agnostic-split-last-batch-end-to-end-duration",
+        "default-batching-strategy",
+        # "best-case",
+    )
     # batch_df, time_df = aggregate_benchmark_dataframes("AutoBatchingSuite")
     # compare_benchmark_performance(
     #     time_df,
