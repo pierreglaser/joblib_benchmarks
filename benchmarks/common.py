@@ -22,6 +22,7 @@ call is run between two iterations of loop 2, in opposition with loop 5.
 
 """
 import os
+import time
 
 import numpy as np
 
@@ -36,6 +37,23 @@ N_JOBS_MAX = os.cpu_count()
 AVG_CALLS_PER_WORKERS = 2
 
 N_FUNCTION_CALLS = AVG_CALLS_PER_WORKERS * N_JOBS_MAX
+
+
+def force_cloudpickle(func):
+    """Clone func into a new, dynamically-created function
+
+    Decorating a function with force_cloudpickle will enforce
+    dynamic-function-like pickling even if the function is defined in a module
+    located in benchmarks/
+    Normal pickling for such functions in asv does not work because asv runs
+    benchmark in isolated directories - to preserve relative imports, it does
+    not add benchmarks/ to sys.path, but instead create a custom entry in
+    sys.meta_path, which is not inherited by joblib workers, causing the
+    workers to error-out when unpickling the tasks they need to execute.
+    """
+    def fn(*args, **kwargs):
+        return func(*args, **kwargs)
+    return fn
 
 
 class Benchmark:
@@ -78,3 +96,16 @@ def compute_eigen(arr):
     return np.linalg.svd(square_matrix)
 
 
+@force_cloudpickle
+def sleep_noop(duration, input_data, output_data_size):
+    """Noop function to emulate real computation.
+
+    Simulate CPU time with by sleeping duration.
+
+    Induce overhead by accepting (and ignoring) any amount of data as input
+    and allocating a requested amount of data.
+
+    """
+    time.sleep(duration)
+    if output_data_size:
+        return np.ones(output_data_size, dtype=np.byte)
