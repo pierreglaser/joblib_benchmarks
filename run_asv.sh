@@ -19,10 +19,22 @@
 # 	asv run -ev -b bench_auto_batching.PartiallyCachedBenchmark.track_p ${branch}^!
 # done
 
-for branch in no-starving; do
-	asv run -ev -b bench_auto_batching.AutoBatchingSuite.track_ ${branch}^!
+# for branch in default-batching-strategy no-starving-backend-agnostic; do
+# 	asv run -ev -b bench_auto_batching.AutoBatchingSuite.track_ ${branch}^!
+# done
+
+# for branch in default-slow-increase-fast-decrease; do
+# 	asv run -ev -b bench_auto_batching.AutoBatchingSuite.track_ ${branch}^!
+# done
+
+for branch in default-batching-strategy; do
+	asv run -ev -b bench_auto_batching.PartiallyCachedBenchmark.track_ ${branch}^!
 done
 
-# for branch in default-batching-strategy; do
-# 	asv run -ev -b bench_auto_batching.AutoBatchingSuite.track_l ${branch}^!
+# for branch in no-starving-backend-agnostic-split-last-batch-end-to-end-duration; do
+# 	asv run -ev -b bench_auto_batching.AutoBatchingSuite.track_ ${branch}^!
+# done
+
+# for branch in no-starving-backend-agnostic-split-last-batch-end-to-end-duration; do
+# 	asv run -ev -b bench_auto_batching.PartiallyCachedBenchmark.track_ ${branch}^!
 # done

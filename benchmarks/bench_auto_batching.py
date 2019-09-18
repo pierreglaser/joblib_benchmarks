@@ -72,7 +72,7 @@ def bench_short_tasks(
 
 
 class AutoBatchingSuite(Benchmark):
-    repeat = 1
+    repeat = 5
     number = 1
     warmup_time = 0
 
@@ -80,7 +80,7 @@ class AutoBatchingSuite(Benchmark):
     params = (
         [10000, 100000, 1000000][:1],
         [1, 0.8, 0.5, 0.2][1:2],
-        [2, 4, 8][:1],
+        [2, 4, 8, 16],
     )
     parallel_parameters = dict(
         verbose=10, backend="loky", pre_dispatch="2*n_jobs"
@@ -196,8 +196,8 @@ class PartiallyCachedBenchmark(Benchmark):
     params = (
         [10000, 100000, 1000000][:1],
         [1, 0.8, 0.5, 0.2][1:2],
-        [2, 4, 8][1:2],
-        [10, 50, 100, 200][-1:]
+        [2, 4, 8, 16],
+        [10, 50, 100, 200],
     )
     param_names = ["size", "eta", "n_jobs", "n_cached"]
 
